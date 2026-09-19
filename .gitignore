@@ -1,30 +1,26 @@
 # Java / Maven
-target/
+backend/target/
 *.class
 
 # Node
-node_modules/
-dist/
-build/
+frontend/node_modules/
+frontend/dist/
+npm-debug.log*
+
+# Uploads (user files — don't commit)
+backend/uploads/
+uploads/
 
 # IDE
 .idea/
+.vscode/
 *.iml
-.classpath
-.project
-.settings/
-
-# Environment / secrets
-.env
-.env.*
-application-local.properties
-
-# Logs
-*.log
-
-# Uploaded files
-uploads/
 
 # OS
 .DS_Store
 Thumbs.db
+
+# Environment / secrets
+.env
+.env.local
+*.log

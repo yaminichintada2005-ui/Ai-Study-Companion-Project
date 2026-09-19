@@ -1,8 +1,13 @@
 package com.aiproof.studycompanion.controller;
 
-import com.aiproof.studycompanion.service.MaterialAiService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.aiproof.studycompanion.service.MaterialAiService;
 
 @RestController
 @RequestMapping("/api/materials")
@@ -16,36 +21,66 @@ public class MaterialAiController {
         this.materialAiService = materialAiService;
     }
 
-    // Generate AI summary of a material
-    @PostMapping("/{materialId}/ai/summary")
+    // =========================================================
+    // SUMMARIZE MATERIAL
+    // POST /api/materials/{materialId}/summarize
+    // =========================================================
+
+    @PostMapping("/{materialId}/summarize")
     public ResponseEntity<String> summarizeMaterial(
-            @PathVariable Long materialId) {
+            @PathVariable Long materialId,
+            Authentication authentication) {
 
-        String result =
-                materialAiService.summarizeMaterial(materialId);
+        String email = authentication.getName();
 
-        return ResponseEntity.ok(result);
+        String summary =
+                materialAiService.summarizeMaterial(
+                        materialId,
+                        email
+                );
+
+        return ResponseEntity.ok(summary);
     }
 
-    // Generate AI explanation of a material
-    @PostMapping("/{materialId}/ai/explain")
+    // =========================================================
+    // EXPLAIN MATERIAL
+    // POST /api/materials/{materialId}/explain
+    // =========================================================
+
+    @PostMapping("/{materialId}/explain")
     public ResponseEntity<String> explainMaterial(
-            @PathVariable Long materialId) {
+            @PathVariable Long materialId,
+            Authentication authentication) {
 
-        String result =
-                materialAiService.explainMaterial(materialId);
+        String email = authentication.getName();
 
-        return ResponseEntity.ok(result);
+        String explanation =
+                materialAiService.explainMaterial(
+                        materialId,
+                        email
+                );
+
+        return ResponseEntity.ok(explanation);
     }
 
-    // Generate AI quiz from a material
-    @PostMapping("/{materialId}/ai/quiz")
+    // =========================================================
+    // GENERATE QUIZ
+    // POST /api/materials/{materialId}/quiz
+    // =========================================================
+
+    @PostMapping("/{materialId}/quiz")
     public ResponseEntity<String> generateQuiz(
-            @PathVariable Long materialId) {
+            @PathVariable Long materialId,
+            Authentication authentication) {
 
-        String result =
-                materialAiService.generateQuiz(materialId);
+        String email = authentication.getName();
 
-        return ResponseEntity.ok(result);
+        String quiz =
+                materialAiService.generateQuiz(
+                        materialId,
+                        email
+                );
+
+        return ResponseEntity.ok(quiz);
     }
 }

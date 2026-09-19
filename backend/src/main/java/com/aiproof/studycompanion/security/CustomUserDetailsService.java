@@ -28,10 +28,21 @@ public class CustomUserDetailsService implements UserDetailsService {
                         )
                 );
 
+        String role = user.getRole();
+
+        // Handle both USER and ROLE_USER formats
+        if (role == null || role.isBlank()) {
+            role = "USER";
+        }
+
+        if (role.startsWith("ROLE_")) {
+            role = role.substring(5);
+        }
+
         return User.builder()
                 .username(user.getEmail())
                 .password(user.getPassword())
-                .roles(user.getRole())
+                .roles(role)
                 .build();
     }
 }

@@ -35,55 +35,94 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             FilterChain filterChain)
             throws ServletException, IOException {
 
+        String path = request.getRequestURI();
+
+        System.out.println("======================================");
+        System.out.println("JWT FILTER: " + request.getMethod() + " " + path);
+
         String authorizationHeader =
                 request.getHeader("Authorization");
 
-        if (authorizationHeader == null ||
-                !authorizationHeader.startsWith("Bearer ")) {
+        if (authorizationHeader == null) {
+
+            System.out.println("JWT FILTER: NO Authorization header");
 
             filterChain.doFilter(request, response);
             return;
         }
 
-        String token =
-                authorizationHeader.substring(7);
+        System.out.println("JWT FILTER: Authorization header received");
+
+        if (!authorizationHeader.startsWith("Bearer ")) {
+
+            System.out.println("JWT FILTER: Invalid Authorization format");
+
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String token = authorizationHeader.substring(7);
 
         try {
 
-            String email =
-                    jwtService.extractEmail(token);
+            String email = jwtService.extractEmail(token);
 
-            if (email != null &&
-                    SecurityContextHolder.getContext()
-                            .getAuthentication() == null) {
+            System.out.println(
+                    "JWT FILTER: Token email = " + email
+            );
 
-                UserDetails userDetails =
-                        userDetailsService.loadUserByUsername(email);
+            UserDetails userDetails =
+                    userDetailsService.loadUserByUsername(email);
 
-                if (jwtService.isTokenValid(
-                        token,
-                        userDetails)) {
+            System.out.println(
+                    "JWT FILTER: User found = "
+                    + userDetails.getUsername()
+            );
 
-                    UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(
-                                    userDetails,
-                                    null,
-                                    userDetails.getAuthorities()
-                            );
+            boolean valid =
+                    jwtService.isTokenValid(token, userDetails);
 
-                    authentication.setDetails(
-                            new WebAuthenticationDetailsSource()
-                                    .buildDetails(request)
-                    );
+            System.out.println(
+                    "JWT FILTER: Token valid = " + valid
+            );
 
-                    SecurityContextHolder.getContext()
-                            .setAuthentication(authentication);
-                }
+            if (valid) {
+
+                UsernamePasswordAuthenticationToken authentication =
+                        new UsernamePasswordAuthenticationToken(
+                                userDetails,
+                                null,
+                                userDetails.getAuthorities()
+                        );
+
+                authentication.setDetails(
+                        new WebAuthenticationDetailsSource()
+                                .buildDetails(request)
+                );
+
+                SecurityContextHolder
+                        .getContext()
+                        .setAuthentication(authentication);
+
+                System.out.println(
+                        "JWT FILTER: AUTHENTICATION SUCCESSFUL"
+                );
+
+            } else {
+
+                System.out.println(
+                        "JWT FILTER: TOKEN INVALID"
+                );
             }
 
         } catch (Exception exception) {
-            // Invalid or expired JWT.
-            // Request continues without authentication.
+
+            System.out.println(
+                    "JWT FILTER ERROR: "
+                    + exception.getClass().getSimpleName()
+                    + " - "
+                    + exception.getMessage()
+            );
         }
 
         filterChain.doFilter(request, response);

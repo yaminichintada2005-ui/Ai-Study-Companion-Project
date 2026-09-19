@@ -1,13 +1,17 @@
 package com.aiproof.studycompanion.controller;
 
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
 import com.aiproof.studycompanion.dto.AiRequest;
 import com.aiproof.studycompanion.dto.AiResponse;
 import com.aiproof.studycompanion.service.AiService;
 
 import jakarta.validation.Valid;
-
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/api/ai")
@@ -19,57 +23,56 @@ public class AiController {
         this.aiService = aiService;
     }
 
-    // General AI question
+    /*
+     * AI Tutor.
+     * When the request carries a materialId, the answer is grounded in
+     * that student's own study material. Ownership is checked inside
+     * AiService via MaterialService.
+     */
     @PostMapping("/ask")
     public ResponseEntity<AiResponse> askAi(
-            @Valid @RequestBody AiRequest request) {
+            @Valid @RequestBody AiRequest request,
+            Authentication authentication) {
 
-        String answer = aiService.askAi(request.message());
+        String email = authentication.getName();
 
-        return ResponseEntity.ok(
-                new AiResponse(answer)
+        String answer = aiService.askAi(
+                request.message(),
+                request.projectId(),
+                request.materialId(),
+                email
         );
+
+        return ResponseEntity.ok(new AiResponse(answer));
     }
 
-    // Explain a topic
+    // Explain a free-text topic.
     @PostMapping("/explain")
     public ResponseEntity<AiResponse> explainTopic(
             @Valid @RequestBody AiRequest request) {
 
-        String answer = aiService.explainTopic(
-                request.message()
-        );
-
         return ResponseEntity.ok(
-                new AiResponse(answer)
+                new AiResponse(aiService.explainTopic(request.message()))
         );
     }
 
-    // Summarize study material
+    // Summarize free text.
     @PostMapping("/summarize")
     public ResponseEntity<AiResponse> summarize(
             @Valid @RequestBody AiRequest request) {
 
-        String answer = aiService.summarize(
-                request.message()
-        );
-
         return ResponseEntity.ok(
-                new AiResponse(answer)
+                new AiResponse(aiService.summarize(request.message()))
         );
     }
 
-    // Generate quiz
+    // Build a quiz from free text.
     @PostMapping("/quiz")
     public ResponseEntity<AiResponse> generateQuiz(
             @Valid @RequestBody AiRequest request) {
 
-        String answer = aiService.generateQuiz(
-                request.message()
-        );
-
         return ResponseEntity.ok(
-                new AiResponse(answer)
+                new AiResponse(aiService.generateQuiz(request.message()))
         );
     }
 }

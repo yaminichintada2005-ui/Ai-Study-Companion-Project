@@ -4,7 +4,16 @@ import java.util.List;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
 import com.aiproof.studycompanion.entity.Material;
@@ -28,9 +37,6 @@ public class MaterialController {
 
     /*
      * Upload PDF or TXT study material.
-     *
-     * File is stored, text is extracted,
-     * and the Material record is saved.
      */
     @PostMapping(
             value = "/project/{projectId}/upload",
@@ -38,8 +44,13 @@ public class MaterialController {
     )
     public ResponseEntity<Material> uploadMaterial(
             @PathVariable Long projectId,
-            @RequestParam("file") MultipartFile file) {
+            @RequestParam("file") MultipartFile file,
+            Authentication authentication) {
 
+        /*
+         * Upload service will be connected to JWT ownership
+         * after we verify its current implementation.
+         */
         Material material =
                 materialUploadService.uploadMaterial(
                         projectId,
@@ -57,16 +68,21 @@ public class MaterialController {
     @PostMapping("/project/{projectId}")
     public ResponseEntity<Material> createMaterial(
             @PathVariable Long projectId,
-            @RequestBody Material material) {
+            @RequestBody Material material,
+            Authentication authentication) {
+
+        String email = authentication.getName();
+
+        Material created =
+                materialService.createMaterial(
+                        projectId,
+                        material,
+                        email
+                );
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
-                .body(
-                        materialService.createMaterial(
-                                projectId,
-                                material
-                        )
-                );
+                .body(created);
     }
 
     /*
@@ -74,13 +90,18 @@ public class MaterialController {
      */
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<Material>> getMaterials(
-            @PathVariable Long projectId) {
+            @PathVariable Long projectId,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(
+        String email = authentication.getName();
+
+        List<Material> materials =
                 materialService.getMaterialsByProject(
-                        projectId
-                )
-        );
+                        projectId,
+                        email
+                );
+
+        return ResponseEntity.ok(materials);
     }
 
     /*
@@ -88,11 +109,18 @@ public class MaterialController {
      */
     @GetMapping("/{id}")
     public ResponseEntity<Material> getMaterial(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(
-                materialService.getMaterialById(id)
-        );
+        String email = authentication.getName();
+
+        Material material =
+                materialService.getMaterialById(
+                        id,
+                        email
+                );
+
+        return ResponseEntity.ok(material);
     }
 
     /*
@@ -101,14 +129,19 @@ public class MaterialController {
     @PutMapping("/{id}")
     public ResponseEntity<Material> updateMaterial(
             @PathVariable Long id,
-            @RequestBody Material material) {
+            @RequestBody Material material,
+            Authentication authentication) {
 
-        return ResponseEntity.ok(
+        String email = authentication.getName();
+
+        Material updated =
                 materialService.updateMaterial(
                         id,
-                        material
-                )
-        );
+                        material,
+                        email
+                );
+
+        return ResponseEntity.ok(updated);
     }
 
     /*
@@ -116,9 +149,15 @@ public class MaterialController {
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteMaterial(
-            @PathVariable Long id) {
+            @PathVariable Long id,
+            Authentication authentication) {
 
-        materialService.deleteMaterial(id);
+        String email = authentication.getName();
+
+        materialService.deleteMaterial(
+                id,
+                email
+        );
 
         return ResponseEntity
                 .noContent()

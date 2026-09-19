@@ -1,4 +1,5 @@
 package com.aiproof.studycompanion.entity;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -46,8 +47,9 @@ public class Material {
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "project_id", nullable = false)
-    private Project project;
+@JoinColumn(name = "project_id", nullable = false)
+@JsonIgnore
+private Project project;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

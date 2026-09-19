@@ -3,60 +3,87 @@ package com.aiproof.studycompanion.service;
 import java.util.List;
 
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import com.aiproof.studycompanion.entity.Material;
 import com.aiproof.studycompanion.entity.Project;
+import com.aiproof.studycompanion.entity.Space;
+import com.aiproof.studycompanion.entity.User;
 import com.aiproof.studycompanion.repository.MaterialRepository;
 import com.aiproof.studycompanion.repository.ProjectRepository;
+import com.aiproof.studycompanion.repository.UserRepository;
 
 @Service
 public class MaterialService {
 
     private final MaterialRepository materialRepository;
     private final ProjectRepository projectRepository;
+    private final UserRepository userRepository;
 
     public MaterialService(
             MaterialRepository materialRepository,
-            ProjectRepository projectRepository) {
+            ProjectRepository projectRepository,
+            UserRepository userRepository) {
 
         this.materialRepository = materialRepository;
         this.projectRepository = projectRepository;
+        this.userRepository = userRepository;
     }
 
+    // Create Material
+    @Transactional
     public Material createMaterial(
             Long projectId,
-            Material material) {
+            Material material,
+            String email) {
 
-        Project project = projectRepository.findById(projectId)
-                .orElseThrow(() ->
-                        new RuntimeException(
-                                "Project not found with id: " + projectId));
+        Project project = getUserProject(projectId, email);
 
         material.setProject(project);
 
         return materialRepository.save(material);
     }
 
+    // Get all materials of a project
+    @Transactional(readOnly = true)
     public List<Material> getMaterialsByProject(
-            Long projectId) {
+            Long projectId,
+            String email) {
 
-        return materialRepository.findByProjectId(projectId);
+        Project project = getUserProject(projectId, email);
+
+        return materialRepository.findByProjectId(project.getId());
     }
 
-    public Material getMaterialById(Long id) {
+    // Get one material
+    @Transactional(readOnly = true)
+    public Material getMaterialById(
+            Long id,
+            String email) {
+
+        User user = getUser(email);
 
         return materialRepository.findById(id)
+                .filter(material ->
+                        material.getProject()
+                                .getSpace()
+                                .getUser()
+                                .getId()
+                                .equals(user.getId()))
                 .orElseThrow(() ->
                         new RuntimeException(
-                                "Material not found with id: " + id));
+                                "Material not found"));
     }
 
+    // Update Material
+    @Transactional
     public Material updateMaterial(
             Long id,
-            Material updatedMaterial) {
+            Material updatedMaterial,
+            String email) {
 
         Material existingMaterial =
-                getMaterialById(id);
+                getMaterialById(id, email);
 
         existingMaterial.setFileName(
                 updatedMaterial.getFileName());
@@ -76,13 +103,47 @@ public class MaterialService {
         existingMaterial.setErrorMessage(
                 updatedMaterial.getErrorMessage());
 
+        existingMaterial.setContent(
+                updatedMaterial.getContent());
+
         return materialRepository.save(existingMaterial);
     }
 
-    public void deleteMaterial(Long id) {
+    // Delete Material
+    @Transactional
+    public void deleteMaterial(
+            Long id,
+            String email) {
 
-        Material material = getMaterialById(id);
+        Material material =
+                getMaterialById(id, email);
 
         materialRepository.delete(material);
+    }
+
+    // Find project only if it belongs to logged-in user
+    private Project getUserProject(
+            Long projectId,
+            String email) {
+
+        User user = getUser(email);
+
+        return projectRepository.findById(projectId)
+                .filter(project ->
+                        project.getSpace()
+                                .getUser()
+                                .getId()
+                                .equals(user.getId()))
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "Project not found"));
+    }
+
+    private User getUser(String email) {
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() ->
+                        new RuntimeException(
+                                "User not found"));
     }
 }

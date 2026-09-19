@@ -1,0 +1,25 @@
+#root {
+    min-height: 100vh;
+}
+
+
+/*
+    The main application styles are currently
+    included inside App.jsx through GlobalStyles.
+
+    This file is intentionally kept clean so that
+    App.css does not conflict with the application.
+*/
+
+* {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    margin: 0;
+    background: #f5f7fb;
+}
