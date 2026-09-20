@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 
-const API_BASE = "http://localhost:9192/api";
+const API_BASE = "https://ai-study-companion-project.onrender.com/api";
 
 /* =============================================================
    AI STUDY COMPANION - COMPLETE FRONTEND
