@@ -144,14 +144,14 @@ public class SecurityConfig {
 
         CorsConfiguration configuration = new CorsConfiguration();
 
-        configuration.setAllowedOrigins(
+        configuration.setAllowedOriginPatterns(
     List.of(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
-        "https://ai-study-companion-project.vercel.app"
+        "https://ai-study-companion-project.vercel.app",
+        "https://*.vercel.app"
     )
 );
-
         configuration.setAllowedMethods(
             List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS")
         );
