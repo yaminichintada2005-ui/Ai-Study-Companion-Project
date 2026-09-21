@@ -48,6 +48,10 @@ public class SecurityConfig {
 
             .authorizeHttpRequests(auth -> auth
 
+                // Admin-only endpoints (must come BEFORE the permitAll rule below,
+                // since Spring Security uses the first matching rule).
+                .requestMatchers("/api/auth/admin/**").hasRole("ADMIN")
+
                 // Login and registration
                 .requestMatchers("/api/auth/**").permitAll()
 

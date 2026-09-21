@@ -13,6 +13,10 @@ function App() {
   const [page, setPage] = useState(getInitialPage());
   const [token, setToken] = useState(() => localStorage.getItem("token"));
   const [email, setEmail] = useState(() => localStorage.getItem("email") || "");
+  const [role, setRole] = useState(() => localStorage.getItem("role") || "");
+
+  const [adminUsers, setAdminUsers] = useState([]);
+  const [adminLoading, setAdminLoading] = useState(false);
 
   const [spaces, setSpaces] = useState([]);
   const [selectedSpace, setSelectedSpace] = useState(() => readStored("selectedSpace"));
@@ -66,17 +70,20 @@ function App() {
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("email");
+    localStorage.removeItem("role");
     localStorage.removeItem("userId");
     localStorage.removeItem("selectedSpace");
     localStorage.removeItem("selectedProject");
     localStorage.removeItem("selectedProjectId");
     setToken(null);
     setEmail("");
+    setRole("");
     setSpaces([]);
     setProjects([]);
     setMaterials([]);
     setSelectedSpace(null);
     setSelectedProject(null);
+    setAdminUsers([]);
     navigate("login");
   };
 
@@ -139,6 +146,27 @@ function App() {
       // ignore
     }
     return text || `${fallback} (${response.status})`;
+  };
+
+  /* =========================================================
+     ADMIN: LOAD ALL USERS + ACTIVITY
+     ========================================================= */
+  const loadAdminUsers = async () => {
+    if (!localStorage.getItem("token")) return;
+
+    try {
+      setAdminLoading(true);
+      clearMessages();
+      const response = await authenticatedFetch(`${API_BASE}/auth/admin/users`, { method: "GET" });
+      if (!response.ok) throw new Error(await readError(response, "Unable to load users"));
+      const data = await response.json();
+      setAdminUsers(Array.isArray(data) ? data : []);
+    } catch (error) {
+      console.error("Load admin users error:", error);
+      if (!error.message.includes("Authentication failed")) setGlobalError(error.message);
+    } finally {
+      setAdminLoading(false);
+    }
   };
 
   /* =========================================================
@@ -479,7 +507,29 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedProject?.id, token]);
 
-  if (!token || page === "login") {
+  useEffect(() => {
+    if (page === "admin" && role === "ADMIN" && token) loadAdminUsers();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, role, token]);
+
+  if (!token || page === "login" || page === "register") {
+    if (page === "register") {
+      return (
+        <>
+          <RegisterPage
+            error={globalError}
+            onRegistered={() => {
+              setGlobalError("");
+              setGlobalMessage("Account created successfully. Please login.");
+              navigate("login");
+            }}
+            onSwitchToLogin={() => navigate("login")}
+          />
+          <GlobalStyles />
+        </>
+      );
+    }
+
     return (
       <>
         <LoginPage
@@ -487,13 +537,16 @@ function App() {
           onLogin={(data) => {
             localStorage.setItem("token", data.token);
             localStorage.setItem("email", data.email || "");
+            localStorage.setItem("role", data.role || "LEARNER");
             if (data.userId != null) localStorage.setItem("userId", String(data.userId));
             setToken(data.token);
             setEmail(data.email || "");
+            setRole(data.role || "LEARNER");
             setGlobalError("");
             window.history.replaceState({}, "", "/dashboard");
             setPage("dashboard");
           }}
+          onSwitchToRegister={() => navigate("register")}
         />
         <GlobalStyles />
       </>
@@ -502,6 +555,7 @@ function App() {
 
   const shared = {
     email,
+    role,
     navigate,
     logout,
     message: globalMessage,
@@ -655,6 +709,30 @@ function App() {
     );
   }
 
+  if (page === "admin") {
+    if (role !== "ADMIN") {
+      return (
+        <Layout {...shared}>
+          <EmptyState
+            icon="🚫"
+            title="Admins only"
+            text="You don't have permission to view this page."
+            action="Go to Dashboard"
+            onAction={() => navigate("dashboard")}
+          />
+          <GlobalStyles />
+        </Layout>
+      );
+    }
+
+    return (
+      <Layout {...shared}>
+        <AdminPage users={adminUsers} loading={adminLoading} onRefresh={loadAdminUsers} />
+        <GlobalStyles />
+      </Layout>
+    );
+  }
+
   return (
     <Layout {...shared}>
       <EmptyState
@@ -672,7 +750,7 @@ function App() {
 /* =============================================================
    LOGIN
    ============================================================= */
-function LoginPage({ onLogin, error: externalError }) {
+function LoginPage({ onLogin, onSwitchToRegister, error: externalError }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -729,6 +807,93 @@ function LoginPage({ onLogin, error: externalError }) {
             {loading ? "Logging in..." : "Login"}
           </button>
         </form>
+
+        <p className="switch-link">
+          Don&apos;t have an account?{" "}
+          <button type="button" className="link-button" onClick={onSwitchToRegister}>
+            Register
+          </button>
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* =============================================================
+   REGISTER
+   ============================================================= */
+function RegisterPage({ onRegistered, onSwitchToLogin, error: externalError }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  const submit = async (event) => {
+    event.preventDefault();
+    setError("");
+
+    if (password !== confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch(`${API_BASE}/auth/register`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), password }),
+      });
+
+      if (!response.ok) {
+        throw new Error(await readLoginError(response));
+      }
+
+      onRegistered();
+    } catch (err) {
+      console.error("Register error:", err);
+      setError(err.message || "Unable to register.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="login-page">
+      <div className="login-card">
+        <div className="login-logo">📝</div>
+        <div className="eyebrow">JOIN AI STUDY COMPANION</div>
+        <h1>Create your account</h1>
+        <p>Register to organize your materials, chat with your AI tutor and practice with quizzes.</p>
+
+        {(error || externalError) && <div className="error">{error || externalError}</div>}
+
+        <form onSubmit={submit}>
+          <label>Full Name</label>
+          <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Enter your name" required />
+          <label>Email</label>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Enter your email" required />
+          <label>Password</label>
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" required />
+          <label>Confirm Password</label>
+          <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Re-enter your password" required />
+          <button className="primary-button full-button" disabled={loading} type="submit">
+            {loading ? "Creating account..." : "Register"}
+          </button>
+        </form>
+
+        <p className="switch-link">
+          Already have an account?{" "}
+          <button type="button" className="link-button" onClick={onSwitchToLogin}>
+            Login
+          </button>
+        </p>
       </div>
     </div>
   );
@@ -746,7 +911,7 @@ async function readLoginError(response) {
 /* =============================================================
    LAYOUT / NAVIGATION
    ============================================================= */
-function Layout({ children, email, navigate, logout, message, error }) {
+function Layout({ children, email, role, navigate, logout, message, error }) {
   return (
     <div className="app-shell">
       <header className="navbar">
@@ -757,6 +922,9 @@ function Layout({ children, email, navigate, logout, message, error }) {
           <button className="nav-button" onClick={() => navigate("projects")}>Projects</button>
           <button className="nav-button ai-nav-button" onClick={() => navigate("ai-chat")}>🤖 AI Tutor</button>
           <button className="nav-button quiz-nav-button" onClick={() => navigate("quiz")}>📝 Quiz</button>
+          {role === "ADMIN" && (
+            <button className="nav-button admin-nav-button" onClick={() => navigate("admin")}>🛡️ Admin</button>
+          )}
           <button className="logout-button" onClick={logout}>Logout</button>
         </nav>
       </header>
@@ -1240,6 +1408,99 @@ function QuizPage({ project, materials, loading, result, resultTitle, onGenerate
 }
 
 /* =============================================================
+   ADMIN
+   ============================================================= */
+function AdminPage({ users, loading, onRefresh }) {
+  return (
+    <div className="page admin-page">
+      <PageHeader
+        title="Admin · Users"
+        subtitle="Everyone who has registered, and what they've created so far."
+        buttonText={loading ? "Refreshing..." : "🔄 Refresh"}
+        onButton={onRefresh}
+      />
+
+      <div className="admin-summary-grid">
+        <div className="stat-card">
+          <span className="stat-icon">👥</span>
+          <strong>{users.length}</strong>
+          <span>Total Users</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon">📚</span>
+          <strong>{users.reduce((sum, u) => sum + (u.spaceCount || 0), 0)}</strong>
+          <span>Total Spaces</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon">📁</span>
+          <strong>{users.reduce((sum, u) => sum + (u.projectCount || 0), 0)}</strong>
+          <span>Total Projects</span>
+        </div>
+        <div className="stat-card">
+          <span className="stat-icon">📄</span>
+          <strong>{users.reduce((sum, u) => sum + (u.materialCount || 0), 0)}</strong>
+          <span>Total Materials</span>
+        </div>
+      </div>
+
+      {users.length === 0 ? (
+        <EmptyState
+          icon="🛡️"
+          title={loading ? "Loading users..." : "No users yet"}
+          text={loading ? "Please wait a moment." : "No one has registered on the platform yet."}
+        />
+      ) : (
+        <div className="admin-table-wrap">
+          <table className="admin-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Email</th>
+                <th>Role</th>
+                <th>Joined</th>
+                <th>Last Login</th>
+                <th>Spaces</th>
+                <th>Projects</th>
+                <th>Materials</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id}>
+                  <td>{user.id}</td>
+                  <td>{user.name}</td>
+                  <td>{user.email}</td>
+                  <td>
+                    <span className={`role-badge role-${String(user.role || "").toLowerCase()}`}>
+                      {user.role}
+                    </span>
+                  </td>
+                  <td>{formatDateTime(user.createdAt)}</td>
+                  <td>{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : "Never"}</td>
+                  <td>{user.spaceCount}</td>
+                  <td>{user.projectCount}</td>
+                  <td>{user.materialCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function formatDateTime(value) {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
+}
+
+/* =============================================================
    SHARED COMPONENTS
    ============================================================= */
 function PageHeader({ title, subtitle, buttonText, onButton }) {
@@ -1498,6 +1759,19 @@ function GlobalStyles() {
     .login-card > p { text-align: center; color: #667085; line-height: 1.55; margin-bottom: 27px; }
     .login-card form { gap: 8px; }
     .login-card input { margin-bottom: 8px; }
+    .switch-link { text-align: center; color: #667085; font-size: 14px; margin: 18px 0 0; }
+    .link-button { border: 0; background: transparent; color: #7524ee; font-weight: 750; padding: 0; text-decoration: underline; }
+    .admin-nav-button { color: #b42318; }
+    .admin-summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 18px; margin-bottom: 30px; }
+    .admin-table-wrap { background: #fff; border: 1px solid #e2e5eb; border-radius: 16px; overflow-x: auto; box-shadow: 0 5px 20px rgba(16,24,40,.035); }
+    .admin-table { width: 100%; border-collapse: collapse; min-width: 760px; }
+    .admin-table th, .admin-table td { text-align: left; padding: 13px 16px; font-size: 13px; border-bottom: 1px solid #eef0f4; white-space: nowrap; }
+    .admin-table th { color: #667085; font-weight: 750; text-transform: uppercase; letter-spacing: .4px; font-size: 11px; background: #fafafa; }
+    .admin-table tbody tr:hover { background: #faf8ff; }
+    .role-badge { padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 800; letter-spacing: .3px; }
+    .role-admin { background: #fef3f2; color: #b42318; }
+    .role-learner { background: #eef4ff; color: #3538cd; }
+    @media (max-width: 780px) { .admin-summary-grid { grid-template-columns: repeat(2, 1fr); } }
     .quiz-result { display: flex; flex-direction: column; gap: 16px; text-align: left; }
     .quiz-source { font-weight: 700; color: #6d20e8; font-size: 13px; }
     .quiz-question { background: #faf7ff; border: 1px solid #e6d8ff; border-radius: 12px; padding: 16px; }
